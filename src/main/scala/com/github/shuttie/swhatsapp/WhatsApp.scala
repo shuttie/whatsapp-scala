@@ -73,6 +73,7 @@ class WhatsApp extends LoggingFSM[State,Context] {
   }
 
   when(LoggedIn) {
+    // send message
     case Event(SendMessage(to, text), ctx:LoginContext) => {
       val body = ProtocolNode("body", data = text.getBytes)
       val id = s"message-${WhatsApp.timestamp}-${ctx.messageCount}"
@@ -82,6 +83,19 @@ class WhatsApp extends LoggingFSM[State,Context] {
     }
     case Event(node @ ProtocolNode("ack", _, _, _), ctx:LoginContext) => {
       ctx.source ! MessageAck(node)
+      stay()
+    }
+
+      // request avatar
+    case Event(GetAvatar(to), ctx:LoginContext) => {
+      val id = s"message-${WhatsApp.timestamp}-${ctx.messageCount}"
+      val pic = ProtocolNode("picture", Map("type" -> "preview"))
+      val node = ProtocolNode("iq", Map("id" -> id, "type" -> "get", "xmlns" -> "w:profile:picture", "to" -> s"$to@${WhatsApp.SERVER}"), List(pic))
+      connector ! WriteNode(node)
+      stay() using ctx.copy(messageCount = ctx.messageCount + 1, source = sender())
+    }
+    case Event(node @ ProtocolNode("iq", att, children, _), ctx:LoginContext) if (att.get("type") == Some("result")) && children.exists(_.tag == "picture") => {
+      ctx.source ! Avatar(node)
       stay()
     }
     case Event(node @ ProtocolNode(_, _, _, _), ctx:LoginContext) => {
