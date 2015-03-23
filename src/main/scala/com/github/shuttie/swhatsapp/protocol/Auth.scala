@@ -7,23 +7,19 @@ import com.github.shuttie.swhatsapp.{KeyStream, Pbkdf2}
 /**
  * Created by shutty on 3/23/15.
  */
-case class Auth(keys:List[Array[Byte]], response:Array[Byte]) {
-
+case class Auth(keys:List[Array[Byte]], response:Array[Byte], inputKey:KeyStream, outputKey:KeyStream) {
 }
 
 object Auth {
   def apply(cellPhone:String, password:String, challenge:Array[Byte]) = {
     val keys = generateKeys(password, challenge)
-    val resp = generateAuthResponse(cellPhone, challenge, keys)
-    new Auth(keys, resp)
-  }
-  private def generateAuthResponse(cellPhone:String, challenge:Array[Byte], keys:List[Array[Byte]]):Array[Byte] = {
     val inputKey = new KeyStream(keys(2), keys(3))
     val outputKey = new KeyStream(keys(0), keys(1))
     val stream = new ByteArrayOutputStream()
     stream.write(cellPhone.getBytes)
     stream.write(challenge)
-    outputKey.encode(stream.toByteArray, 0, 0, stream.size())
+    val response = outputKey.encode(stream.toByteArray, 0, 0, stream.size())
+    new Auth(keys, response, inputKey, outputKey)
   }
 
   private def generateKeys(password:String, challenge:Array[Byte]):List[Array[Byte]] = {

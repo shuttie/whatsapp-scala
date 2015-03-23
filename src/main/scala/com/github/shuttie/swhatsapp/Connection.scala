@@ -57,8 +57,8 @@ class Connection extends LoggingFSM[NetState,NetContext] {
 
   when(Active) {
     case Event(UpgradeKeys(auth), ctx:ActiveContext) => {
-      reader.setKey(new KeyStream(auth.keys(2), auth.keys(3)))
-      writer.setKey(new KeyStream(auth.keys(0), auth.keys(1)))
+      reader.setKey(auth.inputKey)
+      writer.setKey(auth.outputKey)
       log.info("Encryption upgraded")
       stay()
     }
@@ -105,7 +105,8 @@ class Connection extends LoggingFSM[NetState,NetContext] {
     } else {
       val nodeBuffer = data.slice(0, requiredSize)
       val node = reader.nextTree(nodeBuffer)
-      parseNode(data.drop(requiredSize), nodes ++ List(node))
+      val parsedNodes = if (node != null) nodes ++ List(node) else nodes
+      parseNode(data.drop(requiredSize), parsedNodes)
     }
   }
 

@@ -15,4 +15,4 @@ case object LoggedIn extends State
 
 sealed trait Context
 case object Uninitialized extends Context
-case class LoginContext(socket:ActorRef, source:ActorRef, uid:String, password:String, buffer:ByteArrayOutputStream = new ByteArrayOutputStream()) extends Context
+case class LoginContext(socket:ActorRef, source:ActorRef, uid:String, password:String, buffer:ByteArrayOutputStream = new ByteArrayOutputStream(), messageCount:Int = 1) extends Context

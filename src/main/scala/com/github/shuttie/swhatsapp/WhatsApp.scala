@@ -3,12 +3,13 @@ package com.github.shuttie.swhatsapp
 import java.io.{ByteArrayInputStream, ByteArrayOutputStream}
 import java.net.{InetSocketAddress, URLEncoder}
 import java.security.MessageDigest
+import java.util.Date
 
 
 import akka.actor.{Props, Status, ActorRef, LoggingFSM}
 import akka.io.{IO, Tcp}
 import akka.util.{Timeout, ByteString}
-import com.github.shuttie.swhatsapp.messages.{LoginSuccessful, ConnectSuccessful, LoginFailed, LoginRequest}
+import com.github.shuttie.swhatsapp.messages._
 import akka.pattern.ask
 import com.github.shuttie.swhatsapp.protocol.Auth
 import scala.concurrent.Future
@@ -62,7 +63,8 @@ class WhatsApp extends LoggingFSM[State,Context] {
     case Event(ProtocolNode("success", _, _, _), ctx:LoginContext) => {
       log.info("Logged in successfully")
       ctx.source ! LoginSuccessful
-      goto(LoggedIn) using ctx
+      connector ! WriteNode(ProtocolNode("presence", Map("name" -> "shutty")))
+      goto(LoggedIn)
     }
     case Event(node @ ProtocolNode(_, _, _, _), ctx:LoginContext) => {
       log.info(s"received no-op message: $node")
@@ -71,6 +73,13 @@ class WhatsApp extends LoggingFSM[State,Context] {
   }
 
   when(LoggedIn) {
+    case Event(SendMessageRequest(to, text), ctx:LoginContext) => {
+      val body = ProtocolNode("body", data = text.getBytes)
+      val id = s"message-${WhatsApp.timestamp}-${ctx.messageCount}"
+      val message = ProtocolNode("message", Map("to" -> s"$to@${WhatsApp.SERVER}", "type" -> "text", "id" -> id, "t" -> WhatsApp.timestamp), List(body))
+      connector ! WriteNode(message)
+      stay() using ctx.copy(messageCount = ctx.messageCount + 1)
+    }
     case Event(node @ ProtocolNode(_, _, _, _), ctx:LoginContext) => {
       log.info(s"received no-op message: $node")
       stay()
@@ -99,6 +108,11 @@ object WhatsApp {
     val hash = algo.digest()
     val hashString = new String(hash, "iso-8859-1")
     URLEncoder.encode(hashString, "iso-8859-1").toLowerCase
+  }
+
+  def timestamp = {
+    val now = new Date()
+    java.lang.Long.toString(now.getTime / 1000)
   }
 
   //def authBlob()
