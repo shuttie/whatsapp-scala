@@ -5,3 +5,4 @@ package com.github.shuttie.swhatsapp.messages
  */
 sealed trait LoginResponse
 case class LoginFailed(message:String) extends LoginResponse
+case object LoginSuccessful extends LoginResponse

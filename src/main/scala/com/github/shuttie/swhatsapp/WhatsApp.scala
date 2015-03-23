@@ -8,7 +8,7 @@ import java.security.MessageDigest
 import akka.actor.{Props, Status, ActorRef, LoggingFSM}
 import akka.io.{IO, Tcp}
 import akka.util.{Timeout, ByteString}
-import com.github.shuttie.swhatsapp.messages.{ConnectSuccessful, LoginFailed, LoginRequest}
+import com.github.shuttie.swhatsapp.messages.{LoginSuccessful, ConnectSuccessful, LoginFailed, LoginRequest}
 import akka.pattern.ask
 import com.github.shuttie.swhatsapp.protocol.Auth
 import scala.concurrent.Future
@@ -25,11 +25,9 @@ class WhatsApp extends LoggingFSM[State,Context] {
   startWith(Idle, Uninitialized)
 
   when(Idle) {
-    case Event(LoginRequest(uid,password,identity,nick), Uninitialized) => {
-      val id = WhatsApp.buildIdentity(identity)
-      log.debug(s"Using identity: $id")
+    case Event(LoginRequest(uid,password), Uninitialized) => {
       connector ! Connect(WhatsApp.HOST, WhatsApp.PORT)
-      goto(Connecting) using LoginContext(null, sender(), uid, password, id, nick)
+      goto(Connecting) using LoginContext(null, sender(), uid, password)
     }
   }
   when(Connecting) {
@@ -56,6 +54,23 @@ class WhatsApp extends LoggingFSM[State,Context] {
       connector ! UpgradeKeys(auth)
       stay()
     }
+    case Event(ProtocolNode("failure", _, _, _), ctx:LoginContext) => {
+      log.error("Cannot login")
+      ctx.source ! LoginFailed
+      goto(Idle) using Uninitialized
+    }
+    case Event(ProtocolNode("success", _, _, _), ctx:LoginContext) => {
+      log.info("Logged in successfully")
+      ctx.source ! LoginSuccessful
+      goto(LoggedIn) using ctx
+    }
+    case Event(node @ ProtocolNode(_, _, _, _), ctx:LoginContext) => {
+      log.info(s"received no-op message: $node")
+      stay()
+    }
+  }
+
+  when(LoggedIn) {
     case Event(node @ ProtocolNode(_, _, _, _), ctx:LoginContext) => {
       log.info(s"received no-op message: $node")
       stay()
