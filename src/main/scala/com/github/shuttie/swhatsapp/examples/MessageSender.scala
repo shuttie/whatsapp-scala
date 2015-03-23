@@ -3,7 +3,7 @@ package com.github.shuttie.swhatsapp.examples
 import akka.actor.{Props, ActorSystem}
 import akka.util.Timeout
 import com.github.shuttie.swhatsapp.WhatsApp
-import com.github.shuttie.swhatsapp.messages.{SendMessageRequest, LoginResponse, LoginRequest}
+import com.github.shuttie.swhatsapp.messages.{MessageAck, SendMessage, LoginResponse, LoginRequest}
 
 import scala.concurrent.Await
 import scala.concurrent.duration._
@@ -20,7 +20,7 @@ object MessageSender {
     val result = Await.result(wa.ask(LoginRequest("79103408586", "X1E5cALKPQbcZ5TDmACqF5KsV98=")).mapTo[LoginResponse], 10.seconds)
     println(result)
     Thread.sleep(1000)
-    val send = Await.result(wa.ask(SendMessageRequest("79518558900", "privet")), 10.seconds)
+    val send = Await.result(wa.ask(SendMessage("79518558900", "privet")).mapTo[MessageAck], 10.seconds)
     println(send)
     system.awaitTermination()
 

@@ -73,12 +73,16 @@ class WhatsApp extends LoggingFSM[State,Context] {
   }
 
   when(LoggedIn) {
-    case Event(SendMessageRequest(to, text), ctx:LoginContext) => {
+    case Event(SendMessage(to, text), ctx:LoginContext) => {
       val body = ProtocolNode("body", data = text.getBytes)
       val id = s"message-${WhatsApp.timestamp}-${ctx.messageCount}"
       val message = ProtocolNode("message", Map("to" -> s"$to@${WhatsApp.SERVER}", "type" -> "text", "id" -> id, "t" -> WhatsApp.timestamp), List(body))
       connector ! WriteNode(message)
-      stay() using ctx.copy(messageCount = ctx.messageCount + 1)
+      stay() using ctx.copy(messageCount = ctx.messageCount + 1, source = sender())
+    }
+    case Event(node @ ProtocolNode("ack", _, _, _), ctx:LoginContext) => {
+      ctx.source ! MessageAck(node)
+      stay()
     }
     case Event(node @ ProtocolNode(_, _, _, _), ctx:LoginContext) => {
       log.info(s"received no-op message: $node")
