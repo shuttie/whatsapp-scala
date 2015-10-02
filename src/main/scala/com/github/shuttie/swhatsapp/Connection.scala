@@ -76,8 +76,8 @@ class Connection extends LoggingFSM[NetState,NetContext] {
     case Event(Tcp.Received(data:ByteString), ctx:ActiveContext) => {
       val currentBuffer = ctx.buffer ++ data
       val parsed = parseNode(currentBuffer)
-      parsed.foreach(node => ctx.source ! node)
-      goto(Active) using ctx.copy(buffer = Array())
+      parsed._2.foreach(node => ctx.source ! node)
+      goto(Active) using ctx.copy(buffer = parsed._1)
     }
     case Event(x @ _, _) => {
       val br = x
@@ -97,11 +97,12 @@ class Connection extends LoggingFSM[NetState,NetContext] {
   }
 
   @tailrec
-  private def parseNode(data:Array[Byte], nodes:List[ProtocolNode] = List()):List[ProtocolNode] = {
+  private def parseNode(data:Array[Byte], nodes:List[ProtocolNode] = List()):(Array[Byte],List[ProtocolNode]) = {
     val requiredSize = parseResponseSize(data)
+    log.info(s"response size = $requiredSize, data size = ${data.length}")
     if ((requiredSize == 0) || (data.length < requiredSize)) {
       log.info(s"parsed all avaliable ${nodes.size} nodes, ${data.length} bytes left in buffer")
-      nodes
+      data -> nodes
     } else {
       val nodeBuffer = data.slice(0, requiredSize)
       val node = reader.nextTree(nodeBuffer)

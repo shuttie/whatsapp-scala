@@ -89,13 +89,17 @@ class WhatsApp extends LoggingFSM[State,Context] {
       // request avatar
     case Event(GetAvatar(to), ctx:LoginContext) => {
       val id = s"message-${WhatsApp.timestamp}-${ctx.messageCount}"
-      val pic = ProtocolNode("picture", Map("type" -> "preview"))
+      val pic = ProtocolNode("picture", Map("type" -> "image"))
       val node = ProtocolNode("iq", Map("id" -> id, "type" -> "get", "xmlns" -> "w:profile:picture", "to" -> s"$to@${WhatsApp.SERVER}"), List(pic))
       connector ! WriteNode(node)
       stay() using ctx.copy(messageCount = ctx.messageCount + 1, source = sender())
     }
     case Event(node @ ProtocolNode("iq", att, children, _), ctx:LoginContext) if (att.get("type") == Some("result")) && children.exists(_.tag == "picture") => {
       ctx.source ! Avatar(node)
+      stay()
+    }
+    case Event(node @ ProtocolNode("iq", att, _, _), ctx:LoginContext) if att.get("type") == Some("error") => {
+      ctx.source ! new Avatar(att.getOrElse("from", throw new IllegalArgumentException("no from")), None)
       stay()
     }
     case Event(node @ ProtocolNode(_, _, _, _), ctx:LoginContext) => {
